@@ -103,7 +103,7 @@ export default function EditorPage() {
     return <div className="text-center text-red-500 mt-10">{error || "Post not found."}</div>;
   }
 
-  const score = post.seo_score;
+  const score = evaluationResult?.seo_score ?? post.seo_score;
   const isPublishable = score && score >= 6;
 
   return (
