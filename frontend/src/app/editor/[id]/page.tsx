@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import api from "@/lib/axios";
-import { Save, Bot, AlertTriangle, CheckCircle, ArrowLeft } from "lucide-react";
+import { Save, Bot, AlertTriangle, CheckCircle, ArrowLeft, XCircle } from "lucide-react";
 import Link from "next/link";
 
 export default function EditorPage() {
@@ -16,6 +16,7 @@ export default function EditorPage() {
   const [saving, setSaving] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
   const [error, setError] = useState("");
+  const [evaluationResult, setEvaluationResult] = useState<any>(null);
 
   const editor = useEditor({
     extensions: [StarterKit],
@@ -77,6 +78,8 @@ export default function EditorPage() {
         topic: post.idea.topic,
         post_id: post.id
       });
+      // Store the full evaluation result (includes checklist)
+      setEvaluationResult(res.data);
       // refresh post to get new score
       const freshPost = await api.get(`posts/${id}/`);
       setPost(freshPost.data);
@@ -179,39 +182,101 @@ export default function EditorPage() {
               AI SEO Analysis
             </h3>
 
-            {score !== null ? (
-              <div className="space-y-5">
-                <div className="text-center p-4 bg-slate-50 rounded-xl border border-slate-100">
-                  <div className={`text-4xl font-black mb-1 ${score >= 8 ? 'text-green-600' : score >= 6 ? 'text-yellow-600' : 'text-red-600'}`}>
-                    {score}/10
-                  </div>
-                  <div className="text-sm text-slate-500 uppercase tracking-wider font-semibold">SEO Score</div>
-                </div>
+            {score !== null ? (() => {
+              // Parse seo_feedback — it may be JSON (new format) or plain text (old format)
+              let feedbackText = '';
+              let checklist: { item: string; passed: boolean; suggestion: string }[] = [];
+              
+              try {
+                const parsed = JSON.parse(post.seo_feedback);
+                feedbackText = parsed.feedback || '';
+                checklist = parsed.checklist || [];
+              } catch {
+                // Old format: plain text feedback
+                feedbackText = post.seo_feedback || '';
+              }
 
-                {!isPublishable && (
-                  <div className="bg-red-50 text-red-800 p-3 rounded-lg text-sm flex items-start border border-red-100">
-                    <AlertTriangle size={16} className="mr-2 mt-0.5 flex-shrink-0" />
-                    <span>Score too low for publishing. Please improve your content based on the feedback below.</span>
-                  </div>
-                )}
-                {isPublishable && (
-                  <div className="bg-green-50 text-green-800 p-3 rounded-lg text-sm flex items-start border border-green-100">
-                    <CheckCircle size={16} className="mr-2 mt-0.5 flex-shrink-0" />
-                    <span>Great job! This post is ready to be published.</span>
-                  </div>
-                )}
+              // Also check evaluationResult for fresh checklist data
+              if (evaluationResult?.checklist?.length) {
+                checklist = evaluationResult.checklist;
+                feedbackText = evaluationResult.feedback || feedbackText;
+              }
 
-                <div>
-                  <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-2">Actionable Feedback</h4>
-                  <p className="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">{post.seo_feedback}</p>
+              const passedCount = checklist.filter(c => c.passed).length;
+
+              return (
+                <div className="space-y-5">
+                  <div className="text-center p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className={`text-4xl font-black mb-1 ${score >= 8 ? 'text-green-600' : score >= 6 ? 'text-yellow-600' : 'text-red-600'}`}>
+                      {score}/10
+                    </div>
+                    <div className="text-sm text-slate-500 uppercase tracking-wider font-semibold">SEO Score</div>
+                    {checklist.length > 0 && (
+                      <div className="text-xs text-slate-400 mt-1">{passedCount}/{checklist.length} checks passed</div>
+                    )}
+                  </div>
+
+                  {!isPublishable && (
+                    <div className="bg-red-50 text-red-800 p-3 rounded-lg text-sm flex items-start border border-red-100">
+                      <AlertTriangle size={16} className="mr-2 mt-0.5 flex-shrink-0" />
+                      <span>Score too low for publishing. Improve your content based on the feedback below.</span>
+                    </div>
+                  )}
+                  {isPublishable && (
+                    <div className="bg-green-50 text-green-800 p-3 rounded-lg text-sm flex items-start border border-green-100">
+                      <CheckCircle size={16} className="mr-2 mt-0.5 flex-shrink-0" />
+                      <span>Great job! This post is ready to be published.</span>
+                    </div>
+                  )}
+
+                  {/* SEO Checklist */}
+                  {checklist.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-3">SEO Checklist</h4>
+                      <div className="space-y-2">
+                        {checklist.map((check, idx) => (
+                          <div 
+                            key={idx} 
+                            className={`p-2.5 rounded-lg border text-sm ${
+                              check.passed 
+                                ? 'bg-green-50/50 border-green-100' 
+                                : 'bg-red-50/50 border-red-100'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              {check.passed ? (
+                                <CheckCircle size={14} className="text-green-600 flex-shrink-0" />
+                              ) : (
+                                <XCircle size={14} className="text-red-500 flex-shrink-0" />
+                              )}
+                              <span className={`font-medium ${check.passed ? 'text-green-800' : 'text-red-800'}`}>
+                                {check.item}
+                              </span>
+                            </div>
+                            <p className={`text-xs ml-[22px] ${check.passed ? 'text-green-600' : 'text-red-600'}`}>
+                              {check.suggestion}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Detailed Feedback */}
+                  {feedbackText && (
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-2">Detailed Feedback</h4>
+                      <p className="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">{feedbackText}</p>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ) : (
+              );
+            })() : (
               <div className="text-center py-8 text-slate-500">
                 <div className="inline-flex items-center justify-center p-3 bg-slate-100 rounded-full mb-3">
                   <Bot size={24} className="text-slate-400" />
                 </div>
-                <p className="text-sm">Click "Review Post" to get a comprehensive SEO evaluation.</p>
+                <p className="text-sm">Click &quot;Review Post&quot; to get a comprehensive SEO evaluation.</p>
               </div>
             )}
           </div>

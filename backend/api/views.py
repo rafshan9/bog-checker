@@ -1,3 +1,4 @@
+import json
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -42,7 +43,11 @@ def evaluate_post_view(request):
         try:
             post = BlogPost.objects.get(id=post_id)
             post.seo_score = result.get('seo_score')
-            post.seo_feedback = result.get('feedback')
+            # Store the full evaluation result (feedback + checklist) as JSON
+            post.seo_feedback = json.dumps({
+                "feedback": result.get('feedback', ''),
+                "checklist": result.get('checklist', [])
+            })
             post.content = content
             post.save()
         except BlogPost.DoesNotExist:
