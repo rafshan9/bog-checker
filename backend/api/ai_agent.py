@@ -74,7 +74,7 @@ def get_google_suggestions(topic: str) -> list[str]:
     stop=stop_after_attempt(3),
     retry=retry_if_exception(is_retriable_error)
 )
-def chat_with_retry(client, messages, model="llama-3.1-70b-versatile"):
+def chat_with_retry(client, messages, model="openai/gpt-oss-120b"):
     """Send a chat completion request to Groq with retry logic."""
     return client.chat.completions.create(
         model=model,
