@@ -1,8 +1,11 @@
 import os
 import json
 import requests
+# pyrefly: ignore [missing-import]
 from dotenv import load_dotenv
+# pyrefly: ignore [missing-import]
 from groq import Groq
+# pyrefly: ignore [missing-import]
 from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception
 
 
@@ -71,7 +74,7 @@ def get_google_suggestions(topic: str) -> list[str]:
     stop=stop_after_attempt(3),
     retry=retry_if_exception(is_retriable_error)
 )
-def chat_with_retry(client, messages, model="llama-3.3-70b-versatile"):
+def chat_with_retry(client, messages, model="llama-3.1-70b-versatile"):
     """Send a chat completion request to Groq with retry logic."""
     return client.chat.completions.create(
         model=model,
